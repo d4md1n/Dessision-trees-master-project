@@ -34,15 +34,17 @@ object SparkTest {
 
     var decisionAttrEntropy = oneAttributeEntropy(classifiedMeasurements,decisionAttribute)
     println(decisionAttrEntropy)
-    val attr1 = 3
+    val attr1 = 8
     val attr1EntropyOnDecisionAttr =
       classifiedMeasurements
         .map(v => ((v.values(attr1), v.values(decisionAttribute)), 1))
         .reduceByKey((v1,v2) => v1 + v2)
         .map(v => (v._1 ,v._2/numberOfMeasurements.toDouble))
         .groupBy(v => v._1._1)
-        .map(v => v._2.
-          map(v=> (v._1._1,(v._2, entropy(v._2)))).reduce((v1,v2) => (v1._2._1 + v2._2._1, v1._2._2 + v2._2._2)).).sum()
+        .map(v => v._2
+          .map(v => (v._2, entropy(v._2)))
+          .reduce((v1,v2) => (v1._1 + v2._1, v1._2 + v2._2)))
+        .map(v => v._1 * v._2).sum()
 
         //.map(v => entropy(v._2)).sum()
 
