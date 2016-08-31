@@ -1,7 +1,13 @@
 package test.test
 
+import java.util
+import java.util.UUID
+import javax.swing.tree.DefaultMutableTreeNode
+
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
+
+import scala.collection.mutable
 
 /**
   * Created by D4md1 on 22-Aug-16.
@@ -26,34 +32,61 @@ object SparkTest {
     numberOfMeasurements = rdd.count()
     val measurements = rdd.map(s => getRowsObject(s))
     val classifiedMeasurements = classifyMeasurements(measurements)
-
+    decisionAttributeEntropy = oneAttributeEntropy(classifiedMeasurements,decisionAttribute)
 //    println(getAttributeWithMaximumEntropy(classifiedMeasurements))
     //println(oneAttributeEntropy(classifiedMeasurements, 2))
 //    val probabilityRDD = getProbabilityRDD(classifiedMeasurements)
 //    probabilityRDD.foreach(v => println(v))
     //getProbabilitiesByAttribute(probabilityRDD).foreach(v => println(v))
 
-    decisionAttributeEntropy = oneAttributeEntropy(classifiedMeasurements,decisionAttribute)
-    val attr1 = 8
-    val attr1EntropyOnDecisionAttr = getEntropyOverDecisionAttribute(classifiedMeasurements, attr1)
+//
+//    val attr1 = 8
+//    val attr1EntropyOnDecisionAttr = getEntropyOverDecisionAttribute(classifiedMeasurements, attr1)
+//
+//    val gain = decisionAttributeEntropy - attr1EntropyOnDecisionAttr
+//    println(s"the decision Attribute entropy is $decisionAttributeEntropy " +
+//      s"the attr1 entropy over decision attribute is $attr1EntropyOnDecisionAttr" +
+//      s" and the gain is $gain")
 
-    val gain = decisionAttributeEntropy - attr1EntropyOnDecisionAttr
-    println(s"the decision Attribute entropy is $decisionAttributeEntropy " +
-      s"the attr1 entropy over decision attribute is $attr1EntropyOnDecisionAttr" +
-      s" and the gain is $gain")
+    val maxGain = new DefaultMutableTreeNode(getAttributeWithMaximumGain(classifiedMeasurements, decisionAttributeEntropy))
 
-    val maxGain = getAttributeWithMaximumGain(classifiedMeasurements)
+    val userObject = maxGain.getUserObject.asInstanceOf[(Int, Double, Double)]
 
-    println(s"the attribute with the maximum gain is $maxGain")
+    var maxGainList = mutable.MutableList[(Int, (Int, Double, Double))]()
+    for (i<- 0 until numberOfClasses){
+      val filteredMeasurements = classifiedMeasurements.filter(v => v.values(userObject._1) == i)
+      maxGainList += ((i,(getAttributeWithMaximumGain(filteredMeasurements, userObject._2))))
+    }
+
+    val rootOfTree = new DefaultMutableTreeNode(("root"))
+    rootOfTree.add(maxGain)
+    rootOfTree.add(new DefaultMutableTreeNode((UUID.randomUUID(), "test")))
+
+    printTree(rootOfTree)
+
+//    val gain = maxGain._2 - maxFilteredEntropy._2
+
+    //println(s"the attribute with the maximum gain is $maxGain")
+//    println(s"the class of the attribute with max entropy is $maxFilteredEntropy with gain $gain, the starting gain was $maxGain")
+
+    maxGainList.foreach(v => println(v))
   }
 
-  def getAttributeWithMaximumGain(classifiedMeasurements: RDD[ClassifiedMeasurement]): (Int, Double) = {
-    var maximumGain = (0,0.0)
+  def printTree(rootOfTree: DefaultMutableTreeNode): Unit = {
+    val en = rootOfTree.breadthFirstEnumeration()
+    while(en.hasMoreElements) {
+      val node = en.nextElement().asInstanceOf[DefaultMutableTreeNode]
+      println((node, node.getParent))
+    }
+  }
+
+  def getAttributeWithMaximumGain(classifiedMeasurements: RDD[ClassifiedMeasurement], parentEntropy: Double): (Int, Double, Double) = {
+    var maximumGain = (0,0.0, 0.0)
     for (i<-1 until measurementAttributes) {
       val entropyOverDecisionAttribute = getEntropyOverDecisionAttribute(classifiedMeasurements, i)
-      val gain = decisionAttributeEntropy - entropyOverDecisionAttribute
+      val gain = parentEntropy - entropyOverDecisionAttribute
       if (gain > maximumGain._2) {
-        maximumGain = (i, gain)
+        maximumGain = (i, entropyOverDecisionAttribute, gain)
       }
     }
     maximumGain
