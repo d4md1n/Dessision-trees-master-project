@@ -1,13 +1,10 @@
 package test.test
 
-import java.util
-import java.util.UUID
+import java.io.{FileWriter, PrintWriter}
 import javax.swing.tree.DefaultMutableTreeNode
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
-
-import scala.collection.mutable
 
 /**
   * Created by D4md1 on 22-Aug-16.
@@ -19,6 +16,7 @@ object SparkTest {
   val decisionAttribute: Int = 0
   var numberOfMeasurements: Long = 0
   var decisionAttributeEntropy: Double = 0.0
+  val printWriter : PrintWriter = new PrintWriter(new FileWriter("result.txt", true))
 
 
   val conf = new SparkConf()
@@ -33,43 +31,36 @@ object SparkTest {
     val measurements = rdd.map(s => getRowsObject(s))
     val classifiedMeasurements = classifyMeasurements(measurements)
     decisionAttributeEntropy = oneAttributeEntropy(classifiedMeasurements,decisionAttribute)
-//    println(getAttributeWithMaximumEntropy(classifiedMeasurements))
-    //println(oneAttributeEntropy(classifiedMeasurements, 2))
-//    val probabilityRDD = getProbabilityRDD(classifiedMeasurements)
-//    probabilityRDD.foreach(v => println(v))
-    //getProbabilitiesByAttribute(probabilityRDD).foreach(v => println(v))
 
-//
-//    val attr1 = 8
-//    val attr1EntropyOnDecisionAttr = getEntropyOverDecisionAttribute(classifiedMeasurements, attr1)
-//
-//    val gain = decisionAttributeEntropy - attr1EntropyOnDecisionAttr
-//    println(s"the decision Attribute entropy is $decisionAttributeEntropy " +
-//      s"the attr1 entropy over decision attribute is $attr1EntropyOnDecisionAttr" +
-//      s" and the gain is $gain")
+    val maxGain = new DefaultMutableTreeNode((158,getAttributeWithMaximumGain(classifiedMeasurements, decisionAttributeEntropy)))
 
-    val maxGain = new DefaultMutableTreeNode(getAttributeWithMaximumGain(classifiedMeasurements, decisionAttributeEntropy))
 
-    val userObject = maxGain.getUserObject.asInstanceOf[(Int, Double, Double)]
-
-    var maxGainList = mutable.MutableList[(Int, (Int, Double, Double))]()
-    for (i<- 0 until numberOfClasses){
-      val filteredMeasurements = classifiedMeasurements.filter(v => v.values(userObject._1) == i)
-      maxGainList += ((i,(getAttributeWithMaximumGain(filteredMeasurements, userObject._2))))
-    }
-
-    val rootOfTree = new DefaultMutableTreeNode(("root"))
+    nodeIteration(classifiedMeasurements, maxGain)
+    val rootOfTree = new DefaultMutableTreeNode((0,0.0,0.0))
     rootOfTree.add(maxGain)
-    rootOfTree.add(new DefaultMutableTreeNode((UUID.randomUUID(), "test")))
 
-    printTree(rootOfTree)
+    //rootOfTree.add(new DefaultMutableTreeNode((UUID.randomUUID(), "test")))
 
-//    val gain = maxGain._2 - maxFilteredEntropy._2
+    writeTree(rootOfTree)
 
-    //println(s"the attribute with the maximum gain is $maxGain")
-//    println(s"the class of the attribute with max entropy is $maxFilteredEntropy with gain $gain, the starting gain was $maxGain")
+    //maxGainList.foreach(v => println(v))
+  }
 
-    maxGainList.foreach(v => println(v))
+  def nodeIteration(classifiedMeasurements: RDD[ClassifiedMeasurement], maxGain: DefaultMutableTreeNode): Unit = {
+
+    val userObject = maxGain.getUserObject.asInstanceOf[(Int,(Int, Double, Double))]
+
+    //var maxGainList = mutable.MutableList[(Int, (Int, Double, Double))]()
+    for (i <- 0 until numberOfClasses) {
+      val filteredMeasurements = classifiedMeasurements.filter(v => v.values(userObject._2._1) == i)
+      val newNode = new DefaultMutableTreeNode((i, (getAttributeWithMaximumGain(filteredMeasurements, userObject._2._2))))
+      //writeTree(maxGain)
+      maxGain.add(newNode)
+      if(userObject._2._2 > 0.0) {
+        nodeIteration(filteredMeasurements, newNode)
+      }
+
+    }
   }
 
   def printTree(rootOfTree: DefaultMutableTreeNode): Unit = {
@@ -77,6 +68,14 @@ object SparkTest {
     while(en.hasMoreElements) {
       val node = en.nextElement().asInstanceOf[DefaultMutableTreeNode]
       println((node, node.getParent))
+    }
+  }
+
+  def writeTree(rootOfTree: DefaultMutableTreeNode): Unit = {
+    val en = rootOfTree.breadthFirstEnumeration()
+    while(en.hasMoreElements) {
+      val node = en.nextElement().asInstanceOf[DefaultMutableTreeNode]
+      printWriter.append((node, node.getParent).toString())
     }
   }
 
