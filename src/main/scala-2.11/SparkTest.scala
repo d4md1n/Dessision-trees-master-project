@@ -11,16 +11,16 @@ import org.apache.spark.{SparkConf, SparkContext}
   */
 object SparkTest {
 
-  val numberOfClasses: Int = 5
+  val numberOfClasses: Int = 2
   val measurementAttributes: Int = 14
   val decisionAttribute: Int = 0
+  val printWriter : PrintWriter = new PrintWriter(new FileWriter("result.txt", true))
   var numberOfMeasurements: Long = 0
   var decisionAttributeEntropy: Double = 0.0
-  val printWriter : PrintWriter = new PrintWriter(new FileWriter("result.txt", true))
 
 
   val conf = new SparkConf()
-    .setMaster("local[1]")
+    .setMaster("local[4]")
     .setAppName("Spark Test")
   val sc = new SparkContext(conf)
 
@@ -53,11 +53,12 @@ object SparkTest {
     //var maxGainList = mutable.MutableList[(Int, (Int, Double, Double))]()
     for (i <- 0 until numberOfClasses) {
       val filteredMeasurements = classifiedMeasurements.filter(v => v.values(userObject._2._1) == i)
-      val newNode = new DefaultMutableTreeNode((i, (getAttributeWithMaximumGain(filteredMeasurements, userObject._2._2))))
+      val newNode = new DefaultMutableTreeNode((i, getAttributeWithMaximumGain(filteredMeasurements, userObject._2._2)))
       //writeTree(maxGain)
       maxGain.add(newNode)
       if(userObject._2._2 > 0.0) {
         nodeIteration(filteredMeasurements, newNode)
+        println(newNode)
       }
 
     }
